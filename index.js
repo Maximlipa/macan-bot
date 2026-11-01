@@ -4,7 +4,7 @@ const path = require('path');
 
 // 👇 ВСТАВЬ СВОИ ДАННЫЕ С САЙТА ДИСКОРДА В КАВЫЧКИ 👇
 const CLIENT_ID = '1566290468726382632';
-const TOKEN = 'ВСТАВЬ_ТОКЕН';
+const TOKEN = process.env.TOKEN;
 
 const DATA_FILE = path.join(__dirname, 'blacklist.json');
 
