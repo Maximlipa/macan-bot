@@ -118,3 +118,8 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(TOKEN);
+const http = require('http');
+http.createServer((req, res) => {
+    res.write("Bot is online!");
+    res.end();
+}).listen(process.env.PORT || 3000);
