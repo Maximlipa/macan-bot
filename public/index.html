@@ -14,7 +14,6 @@
         .btn-admin-auth { background: #333; color: #ff4444; border: 1px solid #ff4444; cursor: pointer; font-weight: bold; }
         .btn-admin-auth:hover { background: #ff4444; color: #fff; }
         
-        /* Секция админки по умолчанию скрыта */
         .admin-panel { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff4444; }
         .admin-panel h3 { margin-top: 0; color: #ff4444; }
         .form-row { display: flex; gap: 10px; }
@@ -25,21 +24,29 @@
         th, td { padding: 12px; border: 1px solid #333; text-align: left; }
         th { background: #222; }
         
-        .action-cell { display: none; } /* Скрываем колонку действий для гостей */
+        .action-cell { display: none; }
         .btn-remove { background: #ff4444; color: #fff; cursor: pointer; }
         .btn-buyout { background: #4CAF50; color: #fff; cursor: pointer; }
         .btn-remove:hover { background: #cc0000; }
         .btn-buyout:hover { background: #388E3C; }
+
+        /* Модальное окно авторизации */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #1a1a1a; padding: 25px; border-radius: 8px; border: 1px solid #ff4444; width: 300px; text-align: center; }
+        .modal-content h3 { margin-top: 0; color: #ff4444; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-submit { background: #4CAF50; color: #fff; cursor: pointer; width: 50%; }
+        .btn-cancel { background: #555; color: #fff; cursor: pointer; width: 50%; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Чёрный список — Клан МАКАН</h1>
-            <button class="btn-admin-auth" id="authBtn" onclick="toggleAdmin()">🔑 Вход в админку</button>
+            <button class="btn-admin-auth" id="authBtn" onclick="handleAuthClick()">🔑 Вход в админку</button>
         </div>
 
-        <!-- Панель Администратора (Добавление игроков) -->
+        <!-- Панель Администратора -->
         <div class="admin-panel" id="adminPanel">
             <h3>⚙️ Админ-панель: Добавить в ЧС</h3>
             <div class="form-row">
@@ -60,70 +67,93 @@
                     <th>Steam2 ID</th>
                     <th>Причина</th>
                     <th>Откуп</th>
-                    <th class="action-header action-cell">Действия</th>
+                    <th class="action-cell">Действия</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
     </div>
 
+    <!-- Модальное окно для ввода пароля -->
+    <div class="modal-overlay" id="authModal">
+        <div class="modal-content">
+            <h3>Авторизация</h3>
+            <input type="password" id="adminPasswordInput" placeholder="Введите пароль">
+            <div class="modal-buttons">
+                <button class="btn-submit" onclick="submitPassword()">Войти</button>
+                <button class="btn-cancel" onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const ADMIN_PASSWORD = "MAKAN-7Qp!29x";
         let isAdmin = false;
 
-        function toggleAdmin() {
+        function handleAuthClick() {
             if (isAdmin) {
                 isAdmin = false;
                 document.getElementById('authBtn').innerText = '🔑 Вход в админку';
                 document.getElementById('adminPanel').style.display = 'none';
                 loadBlacklist();
-                return;
+            } else {
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('authModal').style.display = 'flex';
             }
+        }
 
-            const pass = prompt('Введите пароль администратора:');
+        function closeModal() {
+            document.getElementById('authModal').style.display = 'none';
+        }
+
+        function submitPassword() {
+            const pass = document.getElementById('adminPasswordInput').value;
             if (pass === ADMIN_PASSWORD) {
                 isAdmin = true;
                 document.getElementById('authBtn').innerText = '🔓 Выйти из админки';
                 document.getElementById('adminPanel').style.display = 'block';
-                alert('Авторизация успешна! Доступны функции администрирования.');
+                closeModal();
                 loadBlacklist();
-            } else if (pass !== null) {
+            } else {
                 alert('Неверный пароль!');
             }
         }
 
         async function loadBlacklist() {
-            const res = await fetch('/api/blacklist');
-            const data = await res.json();
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
+            try {
+                const res = await fetch('/api/blacklist');
+                const data = await res.json();
+                const tbody = document.getElementById('tableBody');
+                tbody.innerHTML = '';
 
-            // Показываем/скрываем заголовок колонки действий
-            document.querySelectorAll('.action-cell').forEach(el => {
-                el.style.display = isAdmin ? 'table-cell' : 'none';
-            });
+                document.querySelectorAll('.action-cell').forEach(el => {
+                    el.style.display = isAdmin ? 'table-cell' : 'none';
+                });
 
-            data.forEach((item, index) => {
-                const tr = document.createElement('tr');
-                
-                let actionButtons = '';
-                if (isAdmin) {
-                    actionButtons = `
-                        <td class="action-cell" style="display: table-cell;">
-                            <button class="btn-buyout" onclick="markPaid(${index})">Выкуплен</button>
-                            <button class="btn-remove" onclick="removeItem(${index})">Удалить</button>
-                        </td>
+                data.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    
+                    let actionButtons = '';
+                    if (isAdmin) {
+                        actionButtons = `
+                            <td class="action-cell" style="display: table-cell;">
+                                <button class="btn-buyout" onclick="markPaid(${index})">Выкуплен</button>
+                                <button class="btn-remove" onclick="removeItem(${index})">Удалить</button>
+                            </td>
+                        `;
+                    }
+
+                    tr.innerHTML = `
+                        <td><code>${item.steam_id}</code></td>
+                        <td>${item.reason}</td>
+                        <td>${item.buyout > 0 ? '$' + item.buyout : 'Без права'}</td>
+                        ${actionButtons}
                     `;
-                }
-
-                tr.innerHTML = `
-                    <td><code>${item.steam_id}</code></td>
-                    <td>${item.reason}</td>
-                    <td>${item.buyout > 0 ? '$' + item.buyout : 'Без права'}</td>
-                    ${actionButtons}
-                `;
-                tbody.appendChild(tr);
-            });
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Ошибка загрузки ЧС:", e);
+            }
         }
 
         async function addBlacklist() {
@@ -168,4 +198,16 @@
             }
         }
 
-        function
+        function filterTable() {
+            let input = document.getElementById('search').value.toLowerCase();
+            let rows = document.getElementById('tableBody').getElementsByTagName('tr');
+            for (let row of rows) {
+                let text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            }
+        }
+
+        loadBlacklist();
+    </script>
+</body>
+</html>
