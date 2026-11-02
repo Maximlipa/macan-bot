@@ -125,12 +125,31 @@ client.login(TOKEN);
 
 // Веб-сервер и API для Discord Activity
 http.createServer((req, res) => {
-    if (req.url === '/api/blacklist' && req.method === 'GET') {
+    // Разбираем URL, чтобы игнорировать гет-параметры от Discord (?frame_id=...)
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = parsedUrl.pathname;
+
+    // API Роуты
+    if (pathname === '/api/blacklist' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify(loadBlacklist()));
     }
 
-    if (req.url === '/api/buyout' && req.method === 'POST') {
+    if (pathname === '/api/add' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            const { steam_id, reason, buyout } = JSON.parse(body);
+            let data = loadBlacklist();
+            data.push({ steam_id, reason, buyout: parseInt(buyout) || 0 });
+            saveBlacklist(data);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        });
+        return;
+    }
+
+    if (pathname === '/api/buyout' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
@@ -147,7 +166,7 @@ http.createServer((req, res) => {
         return;
     }
 
-    if (req.url === '/api/remove' && req.method === 'POST') {
+    if (pathname === '/api/remove' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
@@ -163,7 +182,15 @@ http.createServer((req, res) => {
         return;
     }
 
-    let filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
+    // Раздача статики: отдаем index.html для всех обычных запросов
+    let reqPath = pathname === '/' ? 'index.html' : pathname;
+    let filePath = path.join(__dirname, 'public', reqPath);
+
+    // Если запрашиваемый файл не найден в public, отдаем index.html (fallback)
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(__dirname, 'public', 'index.html');
+    }
+
     fs.readFile(filePath, (err, content) => {
         if (err) {
             res.writeHead(404);
