@@ -15,7 +15,8 @@
         
         .auth-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; display: flex; gap: 10px; }
         .btn-auth { background: #333; color: #ff4444; border: 1px solid #ff4444; cursor: pointer; font-weight: bold; white-space: nowrap; }
-        
+        .btn-auth:hover { background: #ff4444; color: #fff; }
+
         .admin-panel { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff4444; }
         .admin-panel h3 { margin-top: 0; color: #ff4444; }
         .form-row { display: flex; gap: 10px; }
@@ -36,11 +37,13 @@
             <h1>Чёрный список — Клан МАКАН</h1>
         </div>
 
-        <form class="auth-box" id="authForm" onsubmit="return handleLogin(event)">
+        <!-- Поле авторизации -->
+        <div class="auth-box" id="authForm">
             <input type="password" id="adminPasswordInput" placeholder="Введите пароль администратора...">
-            <button type="submit" class="btn-auth">Войти в админку</button>
-        </form>
+            <button type="button" id="loginBtn" class="btn-auth">Войти в админку</button>
+        </div>
 
+        <!-- Панель Администратора -->
         <div class="admin-panel" id="adminPanel">
             <h3>⚙️ Админ-панель: Добавить в ЧС</h3>
             <div class="form-row">
@@ -48,11 +51,11 @@
                 <input type="number" id="addBuyout" placeholder="Откуп ($)" style="flex: 1;">
             </div>
             <input type="text" id="addReason" placeholder="Причина внесения">
-            <button type="button" class="btn-add" onclick="addBlacklist()">Добавить игрока</button>
-            <button type="button" class="btn-auth" style="width:100%; margin-top: 10px;" onclick="logoutAdmin()">Выйти из админки</button>
+            <button type="button" class="btn-add" id="addBtn">Добавить игрока</button>
+            <button type="button" class="btn-auth" id="logoutBtn" style="width:100%; margin-top: 10px;">Выйти из админки</button>
         </div>
 
-        <input type="text" id="search" placeholder="Поиск по Steam2 ID или причине..." onkeyup="filterTable()">
+        <input type="text" id="search" placeholder="Поиск по Steam2 ID или причине...">
         
         <table id="blacklistTable">
             <thead>
@@ -71,9 +74,10 @@
         var ADMIN_PASSWORD = "MAKAN-7Qp!29x";
         var isAdmin = false;
 
-        function handleLogin(e) {
-            if (e) e.preventDefault();
+        // Безопасная привязка событий через JS (работает внутри Discord намертво)
+        document.getElementById('loginBtn').addEventListener('click', function() {
             var pass = document.getElementById('adminPasswordInput').value;
+            
             if (pass === ADMIN_PASSWORD) {
                 isAdmin = true;
                 document.getElementById('authForm').style.display = 'none';
@@ -82,16 +86,52 @@
             } else {
                 alert('Неверный пароль!');
             }
-            return false;
-        }
+        });
 
-        function logoutAdmin() {
+        document.getElementById('adminPasswordInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginBtn').click();
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', function() {
             isAdmin = false;
             document.getElementById('adminPasswordInput').value = '';
             document.getElementById('adminPanel').style.display = 'none';
             document.getElementById('authForm').style.display = 'flex';
             loadBlacklist();
-        }
+        });
+
+        document.getElementById('addBtn').addEventListener('click', function() {
+            var steam_id = document.getElementById('addSteamId').value.trim();
+            var reason = document.getElementById('addReason').value.trim();
+            var buyout = parseInt(document.getElementById('addBuyout').value) || 0;
+
+            if (!steam_id || !reason) {
+                alert('Заполните Steam2 ID и причину!');
+                return;
+            }
+
+            fetch('/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steam_id: steam_id, reason: reason, buyout: buyout })
+            }).then(function() {
+                document.getElementById('addSteamId').value = '';
+                document.getElementById('addReason').value = '';
+                document.getElementById('addBuyout').value = '';
+                loadBlacklist();
+            });
+        });
+
+        document.getElementById('search').addEventListener('keyup', function() {
+            var input = this.value.toLowerCase();
+            var rows = document.getElementById('tableBody').getElementsByTagName('tr');
+            for (var i = 0; i < rows.length; i++) {
+                var text = rows[i].textContent.toLowerCase();
+                rows[i].style.display = text.indexOf(input) > -1 ? '' : 'none';
+            }
+        });
 
         function loadBlacklist() {
             fetch('/api/blacklist')
@@ -125,28 +165,6 @@
                 .catch(function(err) { console.error("Ошибка:", err); });
         }
 
-        function addBlacklist() {
-            var steam_id = document.getElementById('addSteamId').value.trim();
-            var reason = document.getElementById('addReason').value.trim();
-            var buyout = parseInt(document.getElementById('addBuyout').value) || 0;
-
-            if (!steam_id || !reason) {
-                alert('Заполните Steam2 ID и причину!');
-                return;
-            }
-
-            fetch('/api/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steam_id: steam_id, reason: reason, buyout: buyout })
-            }).then(function() {
-                document.getElementById('addSteamId').value = '';
-                document.getElementById('addReason').value = '';
-                document.getElementById('addBuyout').value = '';
-                loadBlacklist();
-            });
-        }
-
         function markPaid(index) {
             fetch('/api/buyout', {
                 method: 'POST',
@@ -161,15 +179,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ index: index })
             }).then(function() { loadBlacklist(); });
-        }
-
-        function filterTable() {
-            var input = document.getElementById('search').value.toLowerCase();
-            var rows = document.getElementById('tableBody').getElementsByTagName('tr');
-            for (var i = 0; i < rows.length; i++) {
-                var text = rows[i].textContent.toLowerCase();
-                rows[i].style.display = text.indexOf(input) > -1 ? '' : 'none';
-            }
         }
 
         loadBlacklist();
