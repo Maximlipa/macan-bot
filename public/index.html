@@ -1,115 +1,178 @@
-<script>
-        const ADMIN_PASSWORD = "MAKAN-7Qp!29x";
-        let isAdmin = false;
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чёрный список | Клан МАКАН</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { color: #ff4444; margin: 0; }
+        
+        input, button { padding: 10px; margin: 5px 0; border-radius: 5px; border: none; font-size: 14px; }
+        input { width: 100%; background: #222; color: #fff; box-sizing: border-box; }
+        
+        .auth-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; display: flex; gap: 10px; }
+        .btn-auth { background: #333; color: #ff4444; border: 1px solid #ff4444; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        
+        .admin-panel { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff4444; }
+        .admin-panel h3 { margin-top: 0; color: #ff4444; }
+        .form-row { display: flex; gap: 10px; }
+        .btn-add { background: #ff4444; color: #fff; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #1a1a1a; }
+        th, td { padding: 12px; border: 1px solid #333; text-align: left; }
+        th { background: #222; }
+        
+        .action-cell { display: none; }
+        .btn-remove { background: #ff4444; color: #fff; cursor: pointer; }
+        .btn-buyout { background: #4CAF50; color: #fff; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Чёрный список — Клан МАКАН</h1>
+        </div>
 
-        function tryLogin() {
-            const inputField = document.getElementById('adminPasswordInput');
-            const pass = inputField.value;
-            
-            console.log("Введенный пароль:", pass); // Посмотрим в консоли браузера
+        <form class="auth-box" id="authForm" onsubmit="return handleLogin(event)">
+            <input type="password" id="adminPasswordInput" placeholder="Введите пароль администратора...">
+            <button type="submit" class="btn-auth">Войти в админку</button>
+        </form>
 
+        <div class="admin-panel" id="adminPanel">
+            <h3>⚙️ Админ-панель: Добавить в ЧС</h3>
+            <div class="form-row">
+                <input type="text" id="addSteamId" placeholder="Steam2 ID (STEAM_0:1:...)" style="flex: 2;">
+                <input type="number" id="addBuyout" placeholder="Откуп ($)" style="flex: 1;">
+            </div>
+            <input type="text" id="addReason" placeholder="Причина внесения">
+            <button type="button" class="btn-add" onclick="addBlacklist()">Добавить игрока</button>
+            <button type="button" class="btn-auth" style="width:100%; margin-top: 10px;" onclick="logoutAdmin()">Выйти из админки</button>
+        </div>
+
+        <input type="text" id="search" placeholder="Поиск по Steam2 ID или причине..." onkeyup="filterTable()">
+        
+        <table id="blacklistTable">
+            <thead>
+                <tr>
+                    <th>Steam2 ID</th>
+                    <th>Причина</th>
+                    <th>Откуп</th>
+                    <th class="action-cell">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        var ADMIN_PASSWORD = "MAKAN-7Qp!29x";
+        var isAdmin = false;
+
+        function handleLogin(e) {
+            if (e) e.preventDefault();
+            var pass = document.getElementById('adminPasswordInput').value;
             if (pass === ADMIN_PASSWORD) {
                 isAdmin = true;
-                document.getElementById('authBox').style.display = 'none';
+                document.getElementById('authForm').style.display = 'none';
                 document.getElementById('adminPanel').style.display = 'block';
                 loadBlacklist();
             } else {
-                alert('Неверный пароль! Вы ввели: ' + pass);
+                alert('Неверный пароль!');
             }
+            return false;
         }
 
         function logoutAdmin() {
             isAdmin = false;
             document.getElementById('adminPasswordInput').value = '';
             document.getElementById('adminPanel').style.display = 'none';
-            document.getElementById('authBox').style.display = 'flex';
+            document.getElementById('authForm').style.display = 'flex';
             loadBlacklist();
         }
 
-        async function loadBlacklist() {
-            try {
-                const res = await fetch('/api/blacklist');
-                const data = await res.json();
-                const tbody = document.getElementById('tableBody');
-                tbody.innerHTML = '';
+        function loadBlacklist() {
+            fetch('/api/blacklist')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = '';
 
-                document.querySelectorAll('.action-cell').forEach(el => {
-                    el.style.display = isAdmin ? 'table-cell' : 'none';
-                });
-
-                data.forEach((item, index) => {
-                    const tr = document.createElement('tr');
-                    
-                    let actionButtons = '';
-                    if (isAdmin) {
-                        actionButtons = `
-                            <td class="action-cell" style="display: table-cell;">
-                                <button class="btn-buyout" onclick="markPaid(${index})">Выкуплен</button>
-                                <button class="btn-remove" onclick="removeItem(${index})">Удалить</button>
-                            </td>
-                        `;
+                    var actionCells = document.querySelectorAll('.action-cell');
+                    for (var i = 0; i < actionCells.length; i++) {
+                        actionCells[i].style.display = isAdmin ? 'table-cell' : 'none';
                     }
 
-                    tr.innerHTML = `
-                        <td><code>${item.steam_id}</code></td>
-                        <td>${item.reason}</td>
-                        <td>${item.buyout > 0 ? '$' + item.buyout : 'Без права'}</td>
-                        ${actionButtons}
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (e) {
-                console.error("Ошибка загрузки:", e);
-            }
+                    data.forEach(function(item, index) {
+                        var tr = document.createElement('tr');
+                        var actionButtons = '';
+                        if (isAdmin) {
+                            actionButtons = '<td class="action-cell" style="display: table-cell;">' +
+                                '<button class="btn-buyout" onclick="markPaid(' + index + ')">Выкуплен</button> ' +
+                                '<button class="btn-remove" onclick="removeItem(' + index + ')">Удалить</button>' +
+                                '</td>';
+                        }
+
+                        tr.innerHTML = '<td><code>' + item.steam_id + '</code></td>' +
+                            '<td>' + item.reason + '</td>' +
+                            '<td>' + (item.buyout > 0 ? '$' + item.buyout : 'Без права') + '</td>' +
+                            actionButtons;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(function(err) { console.error("Ошибка:", err); });
         }
 
-        async function addBlacklist() {
-            const steam_id = document.getElementById('addSteamId').value.trim();
-            const reason = document.getElementById('addReason').value.trim();
-            const buyout = parseInt(document.getElementById('addBuyout').value) || 0;
+        function addBlacklist() {
+            var steam_id = document.getElementById('addSteamId').value.trim();
+            var reason = document.getElementById('addReason').value.trim();
+            var buyout = parseInt(document.getElementById('addBuyout').value) || 0;
 
             if (!steam_id || !reason) {
                 alert('Заполните Steam2 ID и причину!');
                 return;
             }
 
-            await fetch('/api/add', {
+            fetch('/api/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steam_id, reason, buyout })
+                body: JSON.stringify({ steam_id: steam_id, reason: reason, buyout: buyout })
+            }).then(function() {
+                document.getElementById('addSteamId').value = '';
+                document.getElementById('addReason').value = '';
+                document.getElementById('addBuyout').value = '';
+                loadBlacklist();
             });
-
-            document.getElementById('addSteamId').value = '';
-            document.getElementById('addReason').value = '';
-            document.getElementById('addBuyout').value = '';
-            loadBlacklist();
         }
 
-        async function markPaid(index) {
-            await fetch('/api/buyout', {
+        function markPaid(index) {
+            fetch('/api/buyout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index })
-            });
-            loadBlacklist();
+                body: JSON.stringify({ index: index })
+            }).then(function() { loadBlacklist(); });
         }
 
-        async function removeItem(index) {
+        function removeItem(index) {
             fetch('/api/remove', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index })
-            }).then(() => loadBlacklist());
+                body: JSON.stringify({ index: index })
+            }).then(function() { loadBlacklist(); });
         }
 
         function filterTable() {
-            let input = document.getElementById('search').value.toLowerCase();
-            let rows = document.getElementById('tableBody').getElementsByTagName('tr');
-            for (let row of rows) {
-                let text = row.textContent.toLowerCase();
-                row.style.display = text.includes(input) ? '' : 'none';
+            var input = document.getElementById('search').value.toLowerCase();
+            var rows = document.getElementById('tableBody').getElementsByTagName('tr');
+            for (var i = 0; i < rows.length; i++) {
+                var text = rows[i].textContent.toLowerCase();
+                rows[i].style.display = text.indexOf(input) > -1 ? '' : 'none';
             }
         }
 
         loadBlacklist();
     </script>
+</body>
+</html>
