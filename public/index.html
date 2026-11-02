@@ -11,8 +11,10 @@
         input, button { padding: 10px; margin: 5px 0; border-radius: 5px; border: none; font-size: 14px; }
         input { width: 100%; background: #222; color: #fff; box-sizing: border-box; }
         
-        .btn-admin-auth { background: #333; color: #ff4444; border: 1px solid #ff4444; cursor: pointer; font-weight: bold; }
-        .btn-admin-auth:hover { background: #ff4444; color: #fff; }
+        .auth-box { background: #1a1a1a; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; display: flex; gap: 10px; align-items: center; }
+        .auth-box input { margin: 0; }
+        .btn-auth { background: #333; color: #ff4444; border: 1px solid #ff4444; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        .btn-auth:hover { background: #ff4444; color: #fff; }
         
         .admin-panel { display: none; background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff4444; }
         .admin-panel h3 { margin-top: 0; color: #ff4444; }
@@ -29,24 +31,21 @@
         .btn-buyout { background: #4CAF50; color: #fff; cursor: pointer; }
         .btn-remove:hover { background: #cc0000; }
         .btn-buyout:hover { background: #388E3C; }
-
-        /* Модальное окно авторизации */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1a1a1a; padding: 25px; border-radius: 8px; border: 1px solid #ff4444; width: 300px; text-align: center; }
-        .modal-content h3 { margin-top: 0; color: #ff4444; }
-        .modal-buttons { display: flex; gap: 10px; margin-top: 10px; }
-        .btn-submit { background: #4CAF50; color: #fff; cursor: pointer; width: 50%; }
-        .btn-cancel { background: #555; color: #fff; cursor: pointer; width: 50%; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Чёрный список — Клан МАКАН</h1>
-            <button class="btn-admin-auth" id="authBtn" onclick="handleAuthClick()">🔑 Вход в админку</button>
         </div>
 
-        <!-- Панель Администратора -->
+        <!-- Панель входа по паролю прямо на странице -->
+        <div class="auth-box" id="authBox">
+            <input type="password" id="adminPasswordInput" placeholder="Введите пароль администратора...">
+            <button class="btn-auth" onclick="tryLogin()">Войти в админку</button>
+        </div>
+
+        <!-- Панель Администратора (Добавление игроков) -->
         <div class="admin-panel" id="adminPanel">
             <h3>⚙️ Админ-панель: Добавить в ЧС</h3>
             <div class="form-row">
@@ -55,6 +54,7 @@
             </div>
             <input type="text" id="addReason" placeholder="Причина внесения">
             <button class="btn-add" onclick="addBlacklist()">Добавить игрока</button>
+            <button class="btn-auth" style="width:100%; margin-top: 10px;" onclick="logoutAdmin()">Выйти из админки</button>
         </div>
 
         <!-- Поиск -->
@@ -74,49 +74,28 @@
         </table>
     </div>
 
-    <!-- Модальное окно для ввода пароля -->
-    <div class="modal-overlay" id="authModal">
-        <div class="modal-content">
-            <h3>Авторизация</h3>
-            <input type="password" id="adminPasswordInput" placeholder="Введите пароль">
-            <div class="modal-buttons">
-                <button class="btn-submit" onclick="submitPassword()">Войти</button>
-                <button class="btn-cancel" onclick="closeModal()">Отмена</button>
-            </div>
-        </div>
-    </div>
-
     <script>
         const ADMIN_PASSWORD = "MAKAN-7Qp!29x";
         let isAdmin = false;
 
-        function handleAuthClick() {
-            if (isAdmin) {
-                isAdmin = false;
-                document.getElementById('authBtn').innerText = '🔑 Вход в админку';
-                document.getElementById('adminPanel').style.display = 'none';
-                loadBlacklist();
-            } else {
-                document.getElementById('adminPasswordInput').value = '';
-                document.getElementById('authModal').style.display = 'flex';
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('authModal').style.display = 'none';
-        }
-
-        function submitPassword() {
+        function tryLogin() {
             const pass = document.getElementById('adminPasswordInput').value;
             if (pass === ADMIN_PASSWORD) {
                 isAdmin = true;
-                document.getElementById('authBtn').innerText = '🔓 Выйти из админки';
+                document.getElementById('authBox').style.display = 'none';
                 document.getElementById('adminPanel').style.display = 'block';
-                closeModal();
                 loadBlacklist();
             } else {
                 alert('Неверный пароль!');
             }
+        }
+
+        function logoutAdmin() {
+            isAdmin = false;
+            document.getElementById('adminPasswordInput').value = '';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('authBox').style.display = 'flex';
+            loadBlacklist();
         }
 
         async function loadBlacklist() {
@@ -152,7 +131,7 @@
                     tbody.appendChild(tr);
                 });
             } catch (e) {
-                console.error("Ошибка загрузки ЧС:", e);
+                console.error("Ошибка загрузки:", e);
             }
         }
 
@@ -188,14 +167,11 @@
         }
 
         async function removeItem(index) {
-            if (confirm('Точно удалить игрока из ЧС?')) {
-                await fetch('/api/remove', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ index })
-                });
-                loadBlacklist();
-            }
+            fetch('/api/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index })
+            }).then(() => loadBlacklist());
         }
 
         function filterTable() {
