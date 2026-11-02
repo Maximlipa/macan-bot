@@ -153,7 +153,7 @@
 
                         tr.innerHTML = '<td><code>' + item.steam_id + '</code></td>' +
                             '<td>' + item.reason + '</td>' +
-                            '<td>' + (item.buyout > 0 ? '$' + item.buyout : 'Без права') + '</td>' +
+                            '<td>' + (item.buyout > 0 ? '$' + item.buyout.toLocaleString('ru-RU') : 'Без права') + '</td>'
                             actionButtons;
                         tbody.appendChild(tr);
                     });
