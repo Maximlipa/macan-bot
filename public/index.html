@@ -63,7 +63,7 @@
                     <th>Steam2 ID</th>
                     <th>Причина</th>
                     <th>Откуп</th>
-                    <th class="action-cell">Действия</th>
+                    <th>Действия</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
@@ -74,10 +74,8 @@
         var ADMIN_PASSWORD = "MAKAN-7Qp!29x";
         var isAdmin = false;
 
-        // Безопасная привязка событий через JS (работает внутри Discord намертво)
         document.getElementById('loginBtn').addEventListener('click', function() {
             var pass = document.getElementById('adminPasswordInput').value;
-            
             if (pass === ADMIN_PASSWORD) {
                 isAdmin = true;
                 document.getElementById('authForm').style.display = 'none';
@@ -140,19 +138,17 @@
                     var tbody = document.getElementById('tableBody');
                     tbody.innerHTML = '';
 
-                    var actionCells = document.querySelectorAll('.action-cell');
-                    for (var i = 0; i < actionCells.length; i++) {
-                        actionCells[i].style.display = isAdmin ? 'table-cell' : 'none';
-                    }
-
                     data.forEach(function(item, index) {
                         var tr = document.createElement('tr');
+                        
                         var actionButtons = '';
                         if (isAdmin) {
-                            actionButtons = '<td class="action-cell" style="display: table-cell;">' +
-                                '<button class="btn-buyout" onclick="markPaid(' + index + ')">Выкуплен</button> ' +
-                                '<button class="btn-remove" onclick="removeItem(' + index + ')">Удалить</button>' +
+                            actionButtons = '<td>' +
+                                '<button class="btn-buyout" data-action="buyout" data-index="' + index + '">Выкуплен</button> ' +
+                                '<button class="btn-remove" data-action="remove" data-index="' + index + '">Удалить</button>' +
                                 '</td>';
+                        } else {
+                            actionButtons = '<td></td>';
                         }
 
                         tr.innerHTML = '<td><code>' + item.steam_id + '</code></td>' +
@@ -162,24 +158,32 @@
                         tbody.appendChild(tr);
                     });
                 })
-                .catch(function(err) { console.error("Ошибка:", err); });
+                .catch(function(err) { console.error("Ошибка загрузки:", err); });
         }
 
-        function markPaid(index) {
-            fetch('/api/buyout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index: index })
-            }).then(function() { loadBlacklist(); });
-        }
+        document.getElementById('tableBody').addEventListener('click', function(e) {
+            var target = e.target;
+            var action = target.getAttribute('data-action');
+            var index = target.getAttribute('data-index');
 
-        function removeItem(index) {
-            fetch('/api/remove', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index: index })
-            }).then(function() { loadBlacklist(); });
-        }
+            if (!action || index === null) return;
+
+            index = parseInt(index);
+
+            if (action === 'buyout') {
+                fetch('/api/buyout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: index })
+                }).then(function() { loadBlacklist(); });
+            } else if (action === 'remove') {
+                fetch('/api/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: index })
+                }).then(function() { loadBlacklist(); });
+            }
+        });
 
         loadBlacklist();
     </script>
